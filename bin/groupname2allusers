@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+
+"""\
+NAME
+    groupname2allusers - print all users who belong to a group
+
+SYNOPSIS
+    groupname2allusers GROUPNAME...
+
+DESCRIPTION
+    Print out all users who belong to a group, either as primary or secondary 
+    members.
+
+OPTIONS
+    -h, --help
+        Print this help.
+
+AUTHOR
+    John Brunelle
+"""
+
+import sys, getopt, pwd, grp
+
+try:
+	opts, args = getopt.gnu_getopt(sys.argv[1:], 'h', ('help',))
+except getopt.GetoptError, e:
+	sys.stderr.write("*** ERROR **** unable to process command line options: %s\n" % e)
+	sys.exit(1)
+for opt, optarg in opts:
+	if opt in ('-h', '--help'):
+		sys.stdout.write(__doc__)
+		sys.exit(0)
+
+#---
+
+for unixgroup in args:
+	users = set()
+	try:
+		g   = grp.getgrnam(unixgroup)
+		gid = g.gr_gid
+	except KeyError:
+		sys.stderr.write("*** ERROR *** no such unix group [%s]\n" % unixgroup)
+		continue
+	for u in pwd.getpwall():
+		if u.pw_gid==gid:
+			users.add(u.pw_name)
+	for u in g[3]:
+		users.add(u)
+
+	for u in users:
+		print u

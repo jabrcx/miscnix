@@ -1,0 +1,58 @@
+#!/usr/bin/env python
+
+"""\
+NAME
+    adtimestamp2normal - convert AD timestamps to human-readable format
+
+SYNOPSIS
+    adtimestamp2normal AD_TIME...
+
+DESCRIPTION
+    AD attributes such as lastLogon, pwdLastSet, etc. are the number of 100 
+    nanosecond intervals since January 1, 1601 (UTC).  This converts those to 
+    normal dates.
+
+OPTIONS
+    -f, --format FORMAT
+        Use the given format for printing 
+        (see http://docs.python.org/library/time.html#time.strftime).
+        
+    -h, --help
+        Print this help.
+
+AUTHOR
+    John Brunelle
+"""
+
+import sys, os, getopt, datetime
+
+format = "%Y-%m-%d %H:%M:%S"
+
+try:
+	opts, args = getopt.gnu_getopt(sys.argv[1:], 'f:h', ('format=', 'help'))
+except getopt.GetoptError, e:
+	sys.stderr.write("*** ERROR **** unable to process command line options: %s\n" % e)
+	sys.exit(1)
+for opt, optarg in opts:
+	if   opt in ('-f', '--format'):
+		format = optarg
+	elif opt in ('-h', '--help'):
+		sys.stdout.write(__doc__)
+		sys.exit(0)
+
+#if len(args)==0:
+#	sys.stderr.write("*** ERROR *** usage: %s AD_TIME\n" % (os.path.basename(sys.argv[0])))
+#	sys.exit(1)
+
+#---
+
+for arg in args: 
+	try:
+		adtime = int(arg)
+	except ValueError:
+		sys.stderr.write("*** ERROR *** %s is not a valid AD time\n" % arg)
+	t = datetime.datetime(1601, 1, 1) + datetime.timedelta(seconds=adtime*100/10**9)
+	if t.year>=1900:
+		print t.strftime(format) + " UTC"
+	else:
+		sys.stderr.write("*** ERROR *** time [%s] is before 1900 and python doesn't like it\n" % t)

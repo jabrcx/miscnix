@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -e
+
+helpstr="\
+NAME
+    symlink_all_scripts - find executable files and make symlinks to them
+
+SYNOPSIS
+    symlink_all_scripts SOURCE
+
+DESCRIPTION
+    Recursively search SOURCE (a directory) for executable files and create 
+    symbolic links to them.  The symbolic links are created in the current 
+    directory.
+    
+    For portability, SOURCE should be a relative directory.  This script 
+    silently accepts links in the current working directory that have already 
+    been created, and it does not clobber conflicting links/files.  In the 
+    latter case, it prints out an error message and moves on.
+    
+    The search of SOURCE ignores .git and .svn directories.
+
+OPTIONS
+    -h, --help
+        Print this help.
+
+AUTHOR
+    John Brunelle
+"
+
+if getopt -q -l help -o h -- "$@" | egrep -q '^ -h|^ --help'; then echo -n "$helpstr"; exit; fi
+
+source="$1"
+if [ -z "$source" ]; then
+	echo "*** ERROR *** usage: $(basename $0) SOURCE" >&2
+	exit 1
+fi
+if ! [ -d "$source" ]; then
+	echo "*** ERROR *** $source does not exist" >&2
+	exit 1
+fi
+
+set -u
+
+#---
+
+find -L "$source" -name .git -prune -o -name .svn -prune -o \( -type f -a -perm -u=x \) -print | while read path; do
+	basename="$(basename "$path")"
+	
+	#skip files found in our own directory
+	[ "$(readlink -m "$(dirname "$path")")" = "$PWD" ] && continue
+
+	#skip it if the link has already been made
+	[ -e "$basename" ] && [ "$(readlink -m "$basename")" = "$(readlink -m "$path")" ] && continue
+	
+	#don't clobber an existing different link
+	[ -e "$basename" ] && echo "*** ERROR *** unable to create link [$basename] to [$path] since link to [$(readlink "$basename")] already exists" >&2 && continue
+
+	ln -s "$path"
+done
