@@ -58,3 +58,10 @@ find -L "$source" -name .git -prune -o -name .svn -prune -o \( -type f -a -perm 
 
 	ln -s "$path"
 done
+
+##purge broken symlinks
+#find . -type l | while read path; do
+#	if ! readlink -e "$path"; then
+#		echo rm "$path"
+#	fi
+#done
