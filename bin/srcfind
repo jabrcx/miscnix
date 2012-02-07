@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -e
+
+helpstr="\
+NAME
+	srcfind - recursively find files, ignoring common VCS and tmp files
+
+SYNOPSIS
+	srcfind [-d DIRECTORY] PATTERN
+
+DESCRIPTION
+	PATTERN is automatically surrounded by \'*' characters and passed to find's 
+	-iname argument (and is therefore case insenstive).  Directories such as 
+	.git, .svn, CVS, etc. are ignored.  Files such as *.pyc, *.swp, etc. are 
+	ignored.
+
+	By default, the current
+
+OPTIONS
+	-h, --help
+		Print this help.
+	
+	-d, --directory DIRECTORY
+		The parent directory in which to search.
+	
+	-0
+		Use find's -print0 instead of -print.
+
+REQUIREMENTS
+	n/a
+"
+
+directory=.
+printopt='-print'
+
+args=$(getopt -l directory:,help -o d:0h -- "$@")
+if [ $? -ne 0 ]; then
+	exit 65  #(getopt will have written the error message)
+fi
+eval set -- "$args"
+while [ ! -z "$1" ]; do
+	case "$1" in
+		-d | --directory)
+			directory="$2"
+			shift
+			;;
+		-0)
+			printopt='-print0'
+			;;
+
+		-h | --help)
+			echo -n "$helpstr"
+			exit 0
+			;;
+		--) 
+			shift
+			break
+			;;
+	esac
+	shift
+done
+
+pattern="$@"
+if [ -z "$pattern" ]; then
+	pattern='*'
+else
+	pattern='*'"$pattern"'*'
+fi
+
+set -u
+
+
+#---
+
+
+find "$directory" \
+	\( -name .git -o -name .svn -o -name CVS -o -name not_mine \) -prune -o \
+	\( -name '*.pyc' -o -name '*.swp' \) -prune -o \
+	-iname "$pattern" $printopt
