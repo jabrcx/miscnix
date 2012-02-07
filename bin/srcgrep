@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -e
+
+helpstr="\
+NAME
+    srcgrep - recursively grep files, ignoring common VCS and tmp files
+
+SYNOPSIS
+    srcgrep [-d DIRECTORY] [GREP_OPTIONS] PATTERN
+
+DESCRIPTION
+    See srcfind for directories and files that ignored in the search.  Binary 
+    files are also ignored (grep's -I option).
+
+    All arguments that are not options of this script are passed as-is to 
+    grep.  In order to pass options to grep and not have them be interpreted by 
+    this script, set them off with the standard \`--'.  For example, to do a 
+    case-insensitive grep (grep's -i), use:
+    
+        srcgrep -- -i PATTERN
+
+OPTIONS
+    -d, --directory DIRECTORY
+        The parent directory in which to search.
+
+    -h, --help
+        Print this help.
+
+REQUIREMENTS
+    srcfind
+
+AUTHOR
+    John Brunelle
+"
+
+directory=.
+
+args=$(getopt -l directory:,help -o d:h -- "$@")
+if [ $? -ne 0 ]; then
+	exit 65  #(getopt will have written the error message)
+fi
+eval set -- "$args"
+while [ ! -z "$1" ]; do
+	case "$1" in
+		-d | --directory)
+			directory="$2"
+			shift
+			;;
+
+		-h | --help)
+			echo -n "$helpstr"
+			exit 0
+			;;
+		--) 
+			shift
+			break
+			;;
+	esac
+	shift
+done
+
+set -u
+
+
+#---
+
+
+srcfind -d "$directory" -0 | xargs -0 grep --color -I "$@"

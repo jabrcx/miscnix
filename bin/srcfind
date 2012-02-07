@@ -3,31 +3,34 @@ set -e
 
 helpstr="\
 NAME
-	srcfind - recursively find files, ignoring common VCS and tmp files
+    srcfind - recursively find files, ignoring common VCS and tmp files
 
 SYNOPSIS
-	srcfind [-d DIRECTORY] PATTERN
+    srcfind [-d DIRECTORY] PATTERN
 
 DESCRIPTION
-	PATTERN is automatically surrounded by \'*' characters and passed to find's 
-	-iname argument (and is therefore case insenstive).  Directories such as 
-	.git, .svn, CVS, etc. are ignored.  Files such as *.pyc, *.swp, etc. are 
-	ignored.
+    PATTERN is automatically surrounded by \'*' characters and passed to find's 
+    -iname argument (and is therefore case insenstive).  Directories such as 
+    .git, .svn, CVS, etc. are ignored.  Files such as *.pyc, *.swp, etc. are 
+    ignored.
 
-	By default, the current
+    By default, the current
 
 OPTIONS
-	-h, --help
-		Print this help.
-	
-	-d, --directory DIRECTORY
-		The parent directory in which to search.
-	
-	-0
-		Use find's -print0 instead of -print.
+    -d, --directory DIRECTORY
+        The parent directory in which to search.
+    
+    -0
+        Use find's -print0 instead of -print.
+    
+    -h, --help
+        Print this help.
 
 REQUIREMENTS
-	n/a
+    n/a
+
+AUTHOR
+    John Brunelle
 "
 
 directory=.
