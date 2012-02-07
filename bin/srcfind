@@ -75,8 +75,10 @@ set -u
 
 #---
 
+#(not_mine is a hack that is not generally applicable)
 
 find "$directory" \
-	\( -name .git -o -name .svn -o -name CVS -o -name not_mine \) -prune -o \
+	\( -name .git -o -name .svn -o -name CVS \) -prune -o \
 	\( -name '*.pyc' -o -name '*.swp' \) -prune -o \
+	\( -name not_mine \) -prune -o \
 	-iname "$pattern" $printopt
