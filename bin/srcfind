@@ -18,7 +18,8 @@ DESCRIPTION
 
 OPTIONS
     -d, --directory DIRECTORY
-        The parent directory in which to search.
+        The parent directory in which to search.  To search multiple 
+        directories, use this option multiple times.
     
     -0
         Use find's -print0 instead of -print.
@@ -33,7 +34,7 @@ AUTHOR
     John Brunelle
 "
 
-directory=.
+directories=()
 printopt='-print'
 
 args=$(getopt -l directory:,help -o d:0h -- "$@")
@@ -44,7 +45,7 @@ eval set -- "$args"
 while [ ! -z "$1" ]; do
 	case "$1" in
 		-d | --directory)
-			directory="$2"
+			directories[${#directories[@]}]="$2"
 			shift
 			;;
 		-0)
@@ -63,6 +64,8 @@ while [ ! -z "$1" ]; do
 	shift
 done
 
+test ${#arr[*]} = 0 && directories=(.)
+
 pattern="$@"
 if [ -z "$pattern" ]; then
 	pattern='*'
@@ -72,13 +75,14 @@ fi
 
 set -u
 
-
 #---
 
 #(not_mine is a hack that is not generally applicable)
 
-find "$directory" \
-	\( -name .git -o -name .svn -o -name CVS \) -prune -o \
-	\( -name '*.pyc' -o -name '*.swp' \) -prune -o \
-	\( -name not_mine \) -prune -o \
-	-iname "$pattern" $printopt
+for d in "${directories[@]}"; do
+	find "$d" \
+		\( -name .git -o -name .svn -o -name CVS \) -prune -o \
+		\( -name '*.pyc' -o -name '*.swp' \) -prune -o \
+		\( -name not_mine \) -prune -o \
+		-iname "$pattern" $printopt
+done
