@@ -3,10 +3,10 @@ set -e
 
 helpstr="\
 NAME
-    srcgrep - recursively grep files, ignoring common VCS and tmp files
+    srcedit - edit files that contain matches to the given regular expression
 
 SYNOPSIS
-    srcgrep [-d DIRECTORY] [GREP_OPTIONS] PATTERN
+    srcedit [-d DIRECTORY] [GREP_OPTIONS] PATTERN
 
 DESCRIPTION
     See srcfind for directories and files that ignored in the search.  Binary 
@@ -17,25 +17,30 @@ DESCRIPTION
     this script, set them off with the standard \`--'.  For example, to do a 
     case-insensitive grep (grep's -i), use:
     
-        srcgrep -- -i PATTERN
+        srcedit -- -i PATTERN
 
 OPTIONS
     -d, --directory DIRECTORY
         The parent directory in which to search.  Can be used multiple times.
+    
+    -e, --editor-command COMMAND
+        The command to use to edit a file.  It should take one argument, the 
+        filename.  The default is 'gvim -f'.
 
     -h, --help
         Print this help.
 
 REQUIREMENTS
-    srcfind
+    srcgrep
 
 AUTHOR
     John Brunelle
 "
 
 directories=()
+editor_command="gvim -f"
 
-args=$(getopt -l directory:,help -o d:h -- "$@")
+args=$(getopt -l directory:editor-command:,help -o d:e:h -- "$@")
 if [ $? -ne 0 ]; then
 	exit 65  #(getopt will have written the error message)
 fi
@@ -44,6 +49,10 @@ while [ ! -z "$1" ]; do
 	case "$1" in
 		-d | --directory)
 			directories[${#directories[@]}]="$2"
+			shift
+			;;
+		-e | --editor-command)
+			editor_command="$2"
 			shift
 			;;
 
@@ -68,6 +77,7 @@ set -u
 
 #---
 
+set +e  #want to be able to abort certain ones and keep going
 for d in "${directories[@]}"; do
-	srcfind -d "$d" -0 | xargs -0 grep --color -I "$@"
+	srcgrep -d "$d" -- -l "$@" | xargs -I% $editor_command %
 done
