@@ -18,7 +18,8 @@ DESCRIPTION
 
 OPTIONS
     -d, --directory DIRECTORY
-        The parent directory in which to search.  Can be used multiple times.
+        The parent directory in which to search.  To search multiple 
+        directories, use this option multiple times.
     
     -0
         Use find's -print0 instead of -print.
@@ -63,6 +64,8 @@ while [ ! -z "$1" ]; do
 	shift
 done
 
+test ${#arr[*]} = 0 && directories=(.)
+
 pattern="$@"
 if [ -z "$pattern" ]; then
 	pattern='*'
@@ -75,7 +78,6 @@ if [ ${#directories[@]} -eq 0 ]; then
 fi
 
 set -u
-
 
 #---
 
