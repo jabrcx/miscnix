@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+set -e
+
+helpstr="\
+NAME
+    vcssync - sync many VCS checkouts/clones across many hosts
+
+SYNOPSIS
+    vcssync --paths 'PATH1 PATH2 ...' --hosts 'HOST1 HOST2 ...' [OPTIONS]
+
+DESCRIPTION
+    For each given path, take all necessary actions on all hosts to syncronize 
+    the repos -- commit all changes, retrieve all updates, etc.  This currently 
+    only works for git clones and svn checkouts.
+
+    This is an interactive script -- it prompts to continue or not throughout.  
+    Pipe in \`yes' to automate it.
+
+OPTIONS
+    --paths 'PATH1 PATH2 ...'
+        The whitespace-separated list of top level directories (each VCS 
+        checkout/clone).  Basically assumes it's the same path on all hosts, 
+        but variables or special characters like \`~' can be used and are 
+        evaluated on each host.  Obviously, each PATH itself may not contain 
+        any spaces (before being evaluated).  If a path does not exist on a 
+        host, it is noted and getting skipped.
+    
+    --hosts 'HOST1 HOST2 ...'
+        The whitespace-separated list of hosts to involve.  Each HOST entry may 
+        contain several alternative hostnames separated by \`/' 
+        (no whitespace); the first that works will be used.
+    
+    --message MESSAGE
+        The message to use for commits.  Defaults to the name of this script.
+
+    -h, --help
+        Print this help.
+
+REQUIREMENTS
+    n/a
+
+AUTHOR
+    John Brunelle
+"
+
+
+paths=''
+hosts=''
+message="$(basename "$0")"
+
+args=$(getopt -l paths:,hosts:,message:,help -o h -- "$@")
+if [ $? -ne 0 ]; then
+	exit 65  #(getopt will have written the error message)
+fi
+eval set -- "$args"
+while [ ! -z "$1" ]; do
+	case "$1" in
+		--paths)
+			paths="$2"
+			shift
+			;;
+		--hosts)
+			hosts="$2"
+			shift
+			;;
+
+		-h | --help)
+			echo -n "$helpstr"
+			exit 0
+			;;
+		--) 
+			shift
+			break
+			;;
+	esac
+	shift
+done
+
+if [ -z "$paths" ] || [ -z "$hosts" ]; then
+	echo "*** ERROR *** both --paths and --hosts must be given" >&2
+	exit 1
+fi
+
+set -u
+
+
+#---
+
+
+#functions for handling one step for one path on one host
+#these are non-vcs-specific
+status () {
+	local host="$1"
+	local path="$(eval echo $2)"
+	local type="$3"
+	case "$type" in
+		git)
+			echo "(git status -s -b)"
+			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && git status -s -b"
+			;;
+		svn)
+			echo "(svn status)"
+			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && svn status"
+			;;
+	esac
+}
+prep () {
+	local host="$1"
+	local path="$(eval echo $2)"
+	local type="$3"
+	case "$type" in
+		git)
+			echo "(git add .)"
+			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && git add ."
+			echo "(git commit -v -m '$message' .)"
+			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && git commit -v -m '$message' ."
+			;;
+		svn)
+			echo "(add all svn files)"
+			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && svn status | grep '^\?' | while read junk rest; do svn add \"\$rest\"; done"
+			;;
+	esac
+}
+get () {
+	local host="$1"
+	local path="$(eval echo $2)"
+	local type="$3"
+	case "$type" in
+		git)
+			echo "(git pull)"
+			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && git pull"
+			;;
+		svn)
+			echo "(svn up)"
+			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && svn up"
+			;;
+	esac
+}
+put () {
+	local host="$1"
+	local path="$(eval echo $2)"
+	local type="$3"
+	case "$type" in
+		git)
+			echo "(git pull)"
+			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && git pull"
+			echo "(git push)"
+			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && git push"
+			;;
+		svn)
+			echo "(svn -m '$message' commit)":
+			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && svn -m '$message' commit"
+			;;
+	esac
+}
+
+ask () {
+	set +e
+	if ! read -p "Keep going? " answer; then echo; exit 1; fi
+	if [[ "$answer" == n* ]] || [[ "$answer" == N* ]]; then exit 1; fi
+}
+
+#function for handling one directory across all hosts
+doit () {
+	path="$1"
+	type="$2"
+	echo
+	echo
+	echo
+	echo "====================== PATH: $path ======================"
+	echo
+	for step in status prep get put get status; do
+		echo
+		echo "====== STEP: $step ======"
+		echo
+		for host in $hosts; do
+			echo "--- HOST: $host ---"
+			$step "$host" "$path" "$type"
+			echo
+		done
+		ask
+	done
+}
+
+#make a verified lists of actual hosts to use
+hosts2=''
+for hostset in $hosts; do
+	echo "checking if $hostset is available..."
+	gotone=false
+	for host in $(echo $hostset | tr '/' ' '); do
+		if ssh $host -o ConnectTimeout=2 true &>/dev/null; then
+			hosts2="$hosts2 $host"
+			gotone=true
+			break
+		fi
+	done
+	if ! $gotone; then
+		echo -n "WARNING: host $hostset is not available.  "
+		ask
+	fi
+done
+hosts="$hosts2"
+
+#for each directory, loop over all hosts
+for path in $paths; do
+	evaledpath="$(eval echo "$path")"
+	if   [ -d "$evaledpath"/.git ]; then
+		doit "$path" git
+	elif [ -d "$evaledpath"/.svn ]; then
+		doit "$path" svn
+	elif [ -d "$evaledpath"/CVS ]; then
+		echo "*** ERROR *** path [$path] appears to be CVS, and this script does not support CVS" >&2
+		exit 1
+	fi
+done
+
+echo
+echo "ALL DONE"
