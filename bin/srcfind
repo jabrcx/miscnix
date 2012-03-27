@@ -64,7 +64,7 @@ while [ ! -z "$1" ]; do
 	shift
 done
 
-test ${#arr[*]} = 0 && directories=(.)
+test ${#directories[*]} = 0 && directories=(.)
 
 pattern="$@"
 if [ -z "$pattern" ]; then
