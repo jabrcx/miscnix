@@ -16,7 +16,8 @@ DESCRIPTION
     For portability, SOURCE should be a relative directory.  This script 
     silently accepts links in the current working directory that have already 
     been created, and it does not clobber conflicting links/files.  In the 
-    latter case, it prints out an error message and moves on.
+    latter case, it prints out an error message and moves on.  It does, 
+    however, remove any broken symbolic links in the current directory.
     
     The search of SOURCE ignores .git and .svn directories.
 
