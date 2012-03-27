@@ -55,7 +55,10 @@ find -L "$source" -name .git -prune -o -name .svn -prune -o \( -type f -a -perm 
 	[ -e "$basename" ] && [ "$(readlink -m "$basename")" = "$(readlink -m "$path")" ] && continue
 	
 	#don't clobber an existing different link
-	[ -e "$basename" ] && echo "*** ERROR *** unable to create link [$basename] to [$path] since link to [$(readlink "$basename")] already exists" >&2 && continue
+	[ -L "$basename" ] && echo "*** ERROR *** unable to create link [$basename] to [$path] since link to [$(readlink "$basename")] already exists" >&2 && continue
+	
+	#don't clobber an existing file
+	[ -e "$basename" ] && echo "*** ERROR *** unable to create link [$basename] to [$path] since the file already exists" >&2 && continue
 	
 	echo "linking [$path]"
 	ln -s "$path"
