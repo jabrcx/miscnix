@@ -79,5 +79,6 @@ set -u
 
 set +e  #want to be able to abort certain ones and keep going
 for d in "${directories[@]}"; do
-	srcgrep -d "$d" -- -l "$@" | xargs -I% $editor_command %
+	test "$(uname)" = Darwin && xargsnrie='' || xargsnrie='-r'
+	srcgrep -d "$d" -- -l "$@" | xargs $xargsnrie -I% $editor_command %
 done

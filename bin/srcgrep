@@ -68,6 +68,9 @@ set -u
 
 #---
 
+set +e
 for d in "${directories[@]}"; do
-	srcfind -d "$d" -0 | xargs -0 grep --color -I "$@"
+	test "$(uname)" = Darwin && xargsnrie='' || xargsnrie='-r'
+	srcfind -d "$d" -0 | xargs -0 $xargsnrie grep --color -I "$@"
 done
+set -e
