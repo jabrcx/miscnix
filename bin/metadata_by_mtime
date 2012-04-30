@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+
+##continues in the face of failure on individual inputs
+#set -e
+
+helpstr="\
+NAME
+    metadata_by_mtime - set metadata based upon modification times
+
+SYNOPSIS
+    metadata_by_mtime --rename|--set-mtime --reference REFERENCE FILE_OR_DIRECTORY...
+
+DESCRIPTION
+    Rename and/or set modification times of file or directories.  The source 
+    modification time may be the file/directory itself or the earliest or 
+    latest of its contents (if a directory).
+
+OPTIONS
+    --rename
+        Prefix the date to the file/directory name.
+        See --format option below.
+        
+    --set-mtime
+        Set the mtime.
+        Only makes sense for --reference REFERENCE for REFERENCE not self.
+
+    --reference REFERENCE
+        The reference modification time to use.
+        Precision is only to seconds.
+        REFERENCE can be one of the following:
+
+            self
+                The modification time of the given file/directory itself.
+
+            contents-earliest
+            contents-latest
+                The earliest/latest modification time of any contained file or 
+                directory.  Does not include the given file/directory itself.  
+                The search is recursive.
+    
+    --format FORMAT
+        For --rename, the format to use to prefix the date, including any extra 
+        separating character.  The interpreted sequences are the same as for 
+        the date command (but do not include a leading +).  Default is 
+        '%Y%m%d.'
+    
+    --pretend
+        Just print out what it would do, don't actually do it.
+
+    -h, --help
+        Print this help.
+
+REQUIREMENTS
+	python (only if using --rename)
+
+AUTHOR
+    John Brunelle
+"
+
+rename=false
+set_mtime=false
+reference=''
+format='%Y%m%d.'
+prefix=echo  #set to 'echo' to pretend; set to '' to run for real
+
+args=$(getopt -l rename,set-mtime,reference:,format:,help -o h -- "$@")
+if [ $? -ne 0 ]; then
+	exit 65  #(getopt will have written the error message)
+fi
+eval set -- "$args"
+while [ ! -z "$1" ]; do
+	case "$1" in
+		--rename)
+			rename=true
+			;;
+		--set-mtime)
+			set_mtime=true
+			;;
+		--reference)
+			reference="$2"
+			case "$reference" in
+				'self' | 'contents-earliest' | 'contents-latest')
+					;;
+				*)
+					echo "*** ERROR *** invalid --reference value [$reference]" >&2
+					exit 1
+			esac
+			shift
+			;;
+
+		-h | --help)
+			echo -n "$helpstr"
+			exit 0
+			;;
+		--) 
+			shift
+			break
+			;;
+	esac
+	shift
+done
+
+if ! $rename && ! $set_mtime; then
+	echo "*** ERROR *** pick --rename and/or --set-mtime" >&2
+	exit 1
+fi
+if [ -z "$reference" ]; then
+	echo "*** ERROR *** must give a --reference" >&2
+	exit 1
+fi
+
+set -u
+
+#---
+
+for x in "$@"; do
+	#compute reference time t in seconds since the epoch
+	if [ "$reference" = 'self' ]; then
+		t="$(stat -c%Y "$x")"
+		status=$?
+	else
+		if ! [ -d "$x" ]; then
+			echo "*** ERROR ***--reference involves contents but [$x] is not a directory, skipping..." >&2
+			continue
+		fi
+		case "$reference" in
+			'contents-earliest')
+				cmd=head
+				;;
+			'contents-latest')
+				cmd=tail
+				;;
+			#(already verified $reference is one of the above when it was given)
+		esac
+		t="$(find "$x" -mindepth 1 | xargs -I{} stat -c%Y {} | sort -n | "$cmd" -n 1 ; exit ${PIPESTATUS[0]})"
+		status=$?
+		if [ -z "$t" ]; then
+			echo "*** ERROR *** directory [$x] empty, skipping..." >&2
+			continue
+		fi
+	fi
+	if [ "$status" -ne 0 ]; then
+		echo "*** ERROR *** unable to get reference time for [$x], skipping..." >&2
+		continue
+	fi
+
+	if $rename; then
+		#get the absolute path
+		if echo "$x" | grep -qF '"'; then
+			echo "*** ERROR *** complicated filename [$x], can't rename files with \`\"' in them, skipping..." >&2
+			continue
+		fi
+		xabs="$(python -c 'import os; print os.path.abspath('\'"$x"\'')')"
+		if [ $? -ne 0 ] || [ -z "$xabs" ]; then
+			echo "*** ERROR *** unable to get absolute path of [$x], skipping..." >&2
+		fi
+
+		xdir="$(dirname "$xabs")"
+		xbase="$(basename "$xabs")"
+		tstr="$(date -d @"$t" +"$format")"
+		$prefix mv -n "$xabs" "${xdir}/${tstr}${xbase}"
+	fi
+	if $set_mtime; then
+		#(no need for the abspath business here; skip the python dependency and other limitations above)
+		tstr="$(date -d @"$t" +%Y%m%d%H%M.%S)"
+		$prefix touch -t "$tstr" "$x"
+		#(touch --date, combined with stat -c%y above, could be used to get sub-second resolution)
+	fi
+done
