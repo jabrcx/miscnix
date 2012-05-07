@@ -96,11 +96,11 @@ status () {
 	case "$type" in
 		git)
 			echo "(git status -s -b)"
-			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && git status -s -b"
+			ssh "$host" "cd '$path' && git status -s -b"
 			;;
 		svn)
 			echo "(svn status)"
-			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && svn status"
+			ssh "$host" "cd '$path' && svn status"
 			;;
 	esac
 }
@@ -111,13 +111,13 @@ prep () {
 	case "$type" in
 		git)
 			echo "(git add .)"
-			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && git add ."
+			ssh "$host" "cd '$path' && git add ."
 			echo "(git commit -v -m '$message' .)"
-			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && git commit -v -m '$message' ."
+			ssh "$host" "cd '$path' && git commit -v -m '$message' ."
 			;;
 		svn)
 			echo "(add all svn files)"
-			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && svn status | grep '^\?' | while read junk rest; do svn add \"\$rest\"; done"
+			ssh "$host" "cd '$path' && svn status | grep '^\?' | while read junk rest; do svn add \"\$rest\"; done"
 			;;
 	esac
 }
@@ -128,11 +128,11 @@ get () {
 	case "$type" in
 		git)
 			echo "(git pull)"
-			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && git pull"
+			ssh "$host" "cd '$path' && git pull"
 			;;
 		svn)
 			echo "(svn up)"
-			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && svn up"
+			ssh "$host" "cd '$path' && svn up"
 			;;
 	esac
 }
@@ -143,13 +143,13 @@ put () {
 	case "$type" in
 		git)
 			echo "(git pull)"
-			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && git pull"
+			ssh "$host" "cd '$path' && git pull"
 			echo "(git push)"
-			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && git push"
+			ssh "$host" "cd '$path' && git push"
 			;;
 		svn)
 			echo "(svn -m '$message' commit)":
-			ssh "$host" "test -e ~/.ssh/agent_env && source ~/.ssh/agent_env; cd '$path' && svn -m '$message' commit"
+			ssh "$host" "cd '$path' && svn -m '$message' commit"
 			;;
 	esac
 }

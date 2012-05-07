@@ -61,9 +61,9 @@ rename=false
 set_mtime=false
 reference=''
 format='%Y%m%d.'
-prefix=echo  #set to 'echo' to pretend; set to '' to run for real
+prefix=''  #set to 'echo' to pretend; set to '' to run for real
 
-args=$(getopt -l rename,set-mtime,reference:,format:,help -o h -- "$@")
+args=$(getopt -l rename,set-mtime,reference:,format:,pretend,help -o h -- "$@")
 if [ $? -ne 0 ]; then
 	exit 65  #(getopt will have written the error message)
 fi
@@ -86,6 +86,9 @@ while [ ! -z "$1" ]; do
 					exit 1
 			esac
 			shift
+			;;
+		--pretend)
+			prefix=echo
 			;;
 
 		-h | --help)
@@ -120,7 +123,7 @@ for x in "$@"; do
 		status=$?
 	else
 		if ! [ -d "$x" ]; then
-			echo "*** ERROR ***--reference involves contents but [$x] is not a directory, skipping..." >&2
+			echo "*** ERROR *** --reference involves contents but [$x] is not a directory, skipping..." >&2
 			continue
 		fi
 		case "$reference" in
@@ -132,7 +135,7 @@ for x in "$@"; do
 				;;
 			#(already verified $reference is one of the above when it was given)
 		esac
-		t="$(find "$x" -mindepth 1 | xargs -I{} stat -c%Y {} | sort -n | "$cmd" -n 1 ; exit ${PIPESTATUS[0]})"
+		t="$(find "$x" -mindepth 1 -print0 | xargs -0 -I{} stat -c%Y {} | sort -n | "$cmd" -n 1 ; exit ${PIPESTATUS[0]})"
 		status=$?
 		if [ -z "$t" ]; then
 			echo "*** ERROR *** directory [$x] empty, skipping..." >&2
