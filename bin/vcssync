@@ -156,7 +156,7 @@ put () {
 
 ask () {
 	set +e
-	if ! read -p "Keep going? " answer; then echo; exit 1; fi
+	if ! read -p "Keep going? (y/n)[y]: " answer; then echo; exit 1; fi
 	if [[ "$answer" == n* ]] || [[ "$answer" == N* ]]; then exit 1; fi
 }
 
