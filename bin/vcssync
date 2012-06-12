@@ -112,8 +112,8 @@ prep () {
 		git)
 			echo "(git add .)"
 			ssh "$host" "cd '$path' && git add ."
-			echo "(git commit -v -m '$message' .)"
-			ssh "$host" "cd '$path' && git commit -v -m '$message' ."
+			echo "(git commit -v -m '$message')"
+			ssh "$host" "cd '$path' && git commit -v -m '$message'"
 			;;
 		svn)
 			echo "(add all svn files)"
