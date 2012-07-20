@@ -32,49 +32,6 @@ DESCRIPTION
     not write out DIRECTORY/setup.sh, as the name may imply.
 
 OPTIONS
-    --directory DIRECTORY
-        Directory in which to look.  Default is the parent directory of this 
-        script's location.
-
-    --max-depth NAME
-    generate_setup.sh/setup.sh - handle shell environment setup things
-
-SYNOPSIS
-    generate_setup.sh/setup.sh [OPTIONS] [DIRECTORY]
-
-DESCRIPTION
-    This script is used for setting up the environment, or for creating code 
-    that will setup the environment, for software that's laid out in the 
-    standard GNU way -- i.e. directories named \`bin' should be added to the 
-    PATH, directories named \`lib' added to LD_LIBRARY_PATH, etc.  Copy this 
-    script as-is for a general purpose setup.sh, or use it with options for 
-    printing out a setup.sh file or code to be used in modules files (see 
-    http://modules.sourceforge.net/).
-
-    DIRECTORY can be used to specify the directory in which to look.  The 
-    default is the parent directory of this script's location.  See EXAMPLES 
-    below for details.
-
-    This script is aggressive in setting variables, e.g. it adds any 
-    directories named \`include' to both CPATH and FPATH.  It's suggested to 
-    double check what it does.
-
-    Note that although setup.sh is a more appropriate name for this script, it 
-    is NOT named so -- bash's source built-in searches PATH before looking in 
-    PWD for files, and this could really mess up people used to doing \`source 
-    setup.sh' and not \`source ./setup.sh'.  Furthermore, if you run 
-    \`generate_setup.sh DIRECTORY', it only sets up the environment, it does 
-    not write out DIRECTORY/setup.sh, as the name may imply.
-
-OPTIONS
-    --directory DIRECTORY
-        Directory in which to look.  Default is the parent directory of this 
-        script's location.
-
-    --max-depth LLEVELS
-        Maximum depth at which to look (find' -maxdepth option).  Default is 
-        effectively infinite.
-
     --format FORMAT
         FORMAT values can be \`bash' or \`modules' (see 
         http://modules.sourceforge.net/).  Default is \`bash'.
@@ -84,8 +41,12 @@ OPTIONS
         \`eval', to actually evaluate it.  \`eval' only works for \`--format 
         bash'.  Default is \`eval'.
     
+	--max-depth LLEVELS
+        Maximum depth at which to look (find' -maxdepth option).  Default is 
+        effectively infinite.
+    
     -m, --modules-format
-        Legacy.  Shorthand for --format modules --action echo.
+        Legacy.  Shorthand for \`--format modules --action echo'.
 
     -h, --help
         Print this help.
@@ -113,7 +74,7 @@ maxdepth=999999999
 format='bash'
 action='eval'
 
-args=$(getopt -l directory:,max-depth:,format:,action:,modules-format,help -o mh -- "$@")
+args=$(getopt -l format:,action:,max-depth:,modules-format,help -o mh -- "$@")
 if [ $? -ne 0 ]; then
 	#(getopt will have written the error message)
 	return 65 &>/dev/null  #(this script will often be sourced)
@@ -122,14 +83,6 @@ fi
 eval set -- "$args"
 while [ ! -z "$1" ]; do
 	case "$1" in
-		--directory)
-			directory="$2"
-			shift
-			;;
-		--max-depth)
-			maxdepth="$2"
-			shift
-			;;
 		--format)
 			format="$2"
 			shift
@@ -155,6 +108,10 @@ while [ ! -z "$1" ]; do
 					exit 1
 					;;
 			esac
+			;;
+		--max-depth)
+			maxdepth="$2"
+			shift
 			;;
 
 		-m | --modules-format)
