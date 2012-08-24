@@ -158,6 +158,8 @@ for pair in \
 	sbin/PATH \
 	lib/LD_LIBRARY_PATH \
 	lib64/LD_LIBRARY_PATH \
+	lib/LIBRARY_PATH \
+	lib64/LIBRARY_PATH \
 	pkgconfig/PKG_CONFIG_PATH \
 	include/CPATH \
 	include/FPATH \
