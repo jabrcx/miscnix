@@ -10,19 +10,26 @@ SYNOPSIS
 DESCRIPTION
     This script is used for setting up the environment, or for creating code 
     that will setup the environment, for software that's laid out in the 
-    standard GNU way -- i.e. directories named \`bin' should be added to the 
-    PATH, directories named \`lib' added to LD_LIBRARY_PATH, etc.  Copy this 
-    script as-is for a general purpose setup.sh, or use it with options for 
-    printing out a setup.sh file or code to be used in modules files (see 
-    http://modules.sourceforge.net/).
+    Filesystem Hierarchy Standard (GNU) way under a prefix -- i.e. directories 
+    named \`bin' should be added to the PATH, directories named \`lib' added to 
+    LD_LIBRARY_PATH, etc.  Copy this script as-is for a general purpose 
+    setup.sh, or use it with options for printing out a setup.sh file or code 
+    to be used in modules files (see http://modules.sourceforge.net/).
 
     DIRECTORY can be used to specify the directory in which to look.  The 
     default is the parent directory of this script's location.  See EXAMPLES 
     below for details.
 
     This script is aggressive in setting variables, e.g. it adds any 
-    directories named \`include' to both CPATH and FPATH.  It's suggested to 
-    double check what it does.
+    directories named \`include' to both CPATH and FPATH, even though there is 
+    often only one of those two languages used.  To avoid clutter, it's 
+    suggested to double check what it does.
+
+    In addition to searching for the normal GNU layout, this script also has an 
+    option -x/--executables to add to PATH all subdirectories with executables 
+    in them.
+
+    This script will not dig into .git, .svn, or CVS directories.
 
     Note that although setup.sh is a more appropriate name for this script, it 
     is NOT named so -- bash's source built-in searches PATH before looking in 
@@ -41,9 +48,20 @@ OPTIONS
         \`eval', to actually evaluate it.  \`eval' only works for \`--format 
         bash'.  Default is \`eval'.
     
-	--max-depth LLEVELS
-        Maximum depth at which to look (find' -maxdepth option).  Default is 
+    --max-depth LEVELS
+        Maximum depth at which to look (find's -maxdepth option).  Default is 
         effectively infinite.
+
+    -x, --executables
+        Add to PATH all the subdirectories with executables in them that are 
+        found within the directory in which this script lives.  Only 
+        directories to --max-depth are added.  By default, this is done in 
+        addition to the normal search and therefore may add directories to the 
+        PATH twice; see also --no-fhs-search.
+
+    --no-fhs-search
+        Do not do the standard search for bin, lib, etc.  Use in combination 
+        with -x/--executables, otherwise this script will do nothing.
     
     -m, --modules-format
         Legacy.  Shorthand for \`--format modules --action echo'.
@@ -73,8 +91,10 @@ directory=''  #the default is set below (we don't want to use BASH_SOURCE unless
 maxdepth=999999999
 format='bash'
 action='eval'
+executables=false
+no_fhs_search=false
 
-args=$(getopt -l format:,action:,max-depth:,modules-format,help -o mh -- "$@")
+args=$(getopt -l format:,action:,max-depth:,executables,no-fhs-search,modules-format,help -o xmh -- "$@")
 if [ $? -ne 0 ]; then
 	#(getopt will have written the error message)
 	return 65 &>/dev/null  #(this script will often be sourced)
@@ -112,6 +132,12 @@ while [ ! -z "$1" ]; do
 		--max-depth)
 			maxdepth="$2"
 			shift
+			;;
+		-x | --executables)
+			executables=true
+			;;
+		--no-fhs-search)
+			no_fhs_search=true
 			;;
 
 		-m | --modules-format)
@@ -153,22 +179,42 @@ fi
 
 #---
 
-for pair in \
-	bin/PATH \
-	sbin/PATH \
-	lib/LD_LIBRARY_PATH \
-	lib64/LD_LIBRARY_PATH \
-	lib/LIBRARY_PATH \
-	lib64/LIBRARY_PATH \
-	pkgconfig/PKG_CONFIG_PATH \
-	include/CPATH \
-	include/FPATH \
-	info/INFOPATH \
-	site-packages/PYTHONPATH \
-	man/MANPATH \
-; do
-	read -r dir var <<< $(echo $pair | tr / ' ')
-	for d in $(find "$directory" -maxdepth "$maxdepth" -type d -name "$dir"); do
+#hack to avoid digging into version control directories
+prunes="-name .git -o -name .svn -o -name CVS"
+
+if ! $no_fhs_search; then
+	for pair in \
+		bin/PATH \
+		sbin/PATH \
+		lib/LD_LIBRARY_PATH \
+		lib64/LD_LIBRARY_PATH \
+		lib/LIBRARY_PATH \
+		lib64/LIBRARY_PATH \
+		pkgconfig/PKG_CONFIG_PATH \
+		include/CPATH \
+		include/FPATH \
+		info/INFOPATH \
+		site-packages/PYTHONPATH \
+		man/MANPATH \
+	; do
+		read -r dir var <<< $(echo $pair | tr / ' ')
+		for d in $(find "$directory" -maxdepth "$maxdepth" \( $prunes \) -prune -o \( -type d -a -name "$dir" \) -print ); do
+			case "$format" in
+				bash)
+					s='export '$var'="'"$d"':$'$var'"'
+					;;
+				modules)
+					s='prepend-path '$var' '"$d"
+					;;
+			esac
+			$action "$s"
+		done
+	done
+fi
+
+if $executables; then
+	var=PATH
+	for d in $(find -L "$directory" -maxdepth "$(( maxdepth + 1))" \( $prunes \) -prune -o \( -type f -a -perm -u=x \) -print0 | xargs -0 -n 1 dirname | sort | uniq); do
 		case "$format" in
 			bash)
 				s='export '$var'="'"$d"':$'$var'"'
@@ -179,9 +225,4 @@ for pair in \
 		esac
 		$action "$s"
 	done
-done
-
-##adds all directories with executables in them to the PATH
-#for d in $(find -L "$(dirname "$(readlink -e "$BASH_SOURCE")")" -name .git -prune -o -name .svn -prune -o \( -type f -a -perm -u=x \) -print | xargs -n 1 dirname | sort | uniq); do
-#	echo eval 'export PATH="'"$d"':$PATH"'
-#done
+fi
