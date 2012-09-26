@@ -123,7 +123,7 @@ while [ ! -z "$1" ]; do
 				echo | eval)
 					;;
 				*)
-					echo "*** ERROR *** [$format] is not a valid --format" >&2
+					echo "*** ERROR *** [$action] is not a valid --action" >&2
 					return 1 &>/dev/null  #(this script will often be sourced)
 					exit 1
 					;;
