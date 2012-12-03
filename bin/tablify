@@ -1,0 +1,139 @@
+#!/usr/bin/env python
+
+"""\
+NAME
+    tablify - convert data in key/value pairs to a table
+
+SYNOPSIS
+    tablify [--sep SEPARATOR] [FILES...]
+
+DESCRIPTION
+    The input data should be one key/value pair per line.  The very first key 
+    is taken to be the \`trigger' key that will always signify a new entry.
+    
+    Not every entry must have all keys; new ones that appear will be appended 
+    to the list of keys already seen, and entries without corresponding value 
+    for that key will show a 'N/A' value instead.  New keys may appear in other 
+    entries.  Lines that do not parse as a key/value (including blank lines) 
+    are ignored.
+
+    If stdout is a tty, the output is truncated to the screen width.
+
+    Reads from stdin if no files are provided.
+
+OPTIONS
+    --sep SEPARATOR
+        String separating keys and values.  Default is \`:'.
+
+    --headers auto|on|off
+        Whether or not to print out column headers.  The value \`auto' prints 
+        them out only if stdout is a tty.
+
+    -h, --help
+        Print this help.
+
+REQUIREMENTS
+    n/a
+
+AUTHOR
+    John Brunelle
+"""
+
+import sys, getopt, fcntl, termios, struct, errno
+
+
+sep = ':'
+headers = 'auto'
+
+try:
+	opts, args = getopt.gnu_getopt(sys.argv[1:], 'h', ('sep=', 'headers=', 'help',))
+except getopt.GetoptError, e:
+	sys.stderr.write("*** ERROR **** unable to process command line options: %s\n" % e)
+	sys.exit(1)
+for opt, optarg in opts:
+	if   opt in ('--sep',):
+		sep = optarg
+	elif opt in ('--headers',):
+		headers = optarg
+		if headers not in ('auto', 'on', 'off'):
+			sys.stderr.write("*** ERROR *** --headers must be \`auto', \`on', or \`off'\n")
+			sys.exit(1)
+	elif opt in ('-h', '--help'):
+		sys.stdout.write(__doc__)
+		sys.exit(0)
+
+
+#---
+
+keys    = []  #full set of key values
+widths  = []  #the maximum width of an entry or the key itself
+entries = []  #all the entries, each a dict keyed by the keys (may not have all of them)
+
+border_width = 1
+
+NA = 'N/A'
+
+try:
+	if sys.stdout.isatty():
+		termheight, termwidth = struct.unpack('hh', fcntl.ioctl(sys.stdout.fileno(), termios.TIOCGWINSZ, 'abcd'))
+		maxwidth = termwidth
+	else:
+		maxwidth = 999999999
+	
+	#collect all file objects to loop over
+	files = []
+	for f in args:
+		files.append(f.open())
+	if len(files)==0: files.append(sys.stdin)
+	
+	#get all entries
+	firstkey = True
+	for f in files:
+		entry = {}
+		for line in f:
+			try:
+				key, val = [ s.strip() for s in line.split(':',1) ]
+			except ValueError:
+				continue
+			if firstkey:
+				triggerkey=key
+				firstkey=False
+			if key==triggerkey and len(entry)>0:
+				entries.append(entry)
+				entry = {}
+			if key not in keys: keys.append(key)
+			entry[key] = val
+		if len(entry)>0: entries.append(entry)
+	
+	#figure out the widths
+	for key in keys:
+		w = len(key)
+		w = max(w, len(NA))  #(the NA string may be the longer than anything else)
+		for entry in entries:
+			try:
+				w = max(w, len(entry[key]))
+			except KeyError:
+				pass
+		w += border_width
+		widths.append(w)
+
+	#deal with the headers
+	if headers=='on' or (headers=='auto' and sys.stdout.isatty()):
+		line = ''
+		for width, key in zip(widths, keys):
+			line += '%-*s' % (width, key) + ' '*border_width
+		print line[:maxwidth]
+		print maxwidth*'-'
+	
+	#print out all the entries
+	for entry in entries:
+		line = ''
+		for width, key in zip(widths, keys):
+			try:
+				val = entry[key]
+			except KeyError:
+				val = NA
+			line += '%-*s' % (width, val) + ' '*border_width
+		print line[:maxwidth]
+except IOError, e:
+	if not (hasattr(e, 'errno') and e.errno==errno.EPIPE): raise
