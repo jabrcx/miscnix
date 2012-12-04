@@ -1,0 +1,239 @@
+#!/usr/bin/env python
+
+"""\
+NAME
+    editnames - rename files using an editor
+
+SYNOPSIS
+    editnames [OPTIONS] [-- LS_OPTIONS] [NAMES]
+
+DESCRIPTION
+    Rename files in the current working directory, or files passed as 
+    arguments, by editing them in a text editor.  All non-option arguments are 
+    passed verbatim to ls.  As is the usual GNU getopt style, use `--' if you 
+    wish to pass arguments to ls that begin with `-'.  For example, 
+    `editnames -v -- -t foo bar' will call this program with the verbose 
+    option, using ls to list foo and bar sorted by modification time.
+
+    Without any arguments, this edits names in the current working directory.  
+    Directories and symbolic links may be given as arguments, but this operates 
+    on them directoy ant not their contents/targets (-d is added to ls in these 
+    cases).
+    
+    This works for renaming both files and directories.  If filenames are added 
+    to or deleted from the list in the editor, this program will catch that 
+    before renaming any file and will refuse to continue.  Files that are not 
+    renamed are not touched.
+
+    See also qmv from the renameutils package.
+
+OPTIONS
+    --editor EDITOR
+        Which editor to use.  Default is the value of the EDITOR environment 
+        variable, or vim if EDITOR is not defined.  May include options; for 
+        example, 'gvim -f' works.  If the editor ends with 
+        \`vim', \`-n --nofork' is added.
+
+    --savelists
+        Do not delete the temporary files listing the old and new names, and 
+        print a message noting where they are.
+    
+    --oldlist FILENAME
+        List of old filenames, instead of generating with ls.  Usually used in 
+        combination with --newlist.
+    
+    --newlist FILENAME
+        List of new filename.
+        Usually used in combination with --oldlist.
+    
+    -v, --verbose
+        Print out what this script does.
+    
+    -p, --pretend
+        Don't actually rename the files.
+        Most useful when combined with -v/--verbose.
+
+    -h, --help
+        Print this help.
+
+REQUIREMENTS
+    Writes new files to /tmp.
+
+AUTHOR
+    John Brunelle
+"""
+
+import sys, os, getopt, subprocess
+
+editor = 'vim'
+try:
+	x = os.environ['EDITOR']
+	if x!='': editor = x
+except KeyError:
+	pass
+savelists = False
+oldlist = None
+tmplist = None
+newlist = None
+pretend = False
+verbose = False
+
+try:
+	opts, args = getopt.gnu_getopt(sys.argv[1:], 'vph', ('editor=', 'savelists', 'oldlist=', 'newlist=', 'pretend', 'verbose', 'help',))
+except getopt.GetoptError, e:
+	sys.stderr.write("*** ERROR **** unable to process command line options: %s\n" % e)
+	sys.exit(1)
+for opt, optarg in opts:
+	if   opt in ('--editor',):
+		editor = optarg
+	elif opt in ('--savelists',):
+		savelists = True
+	elif opt in ('--oldlist',):
+		oldlist = optarg
+	elif opt in ('--oldlist',):
+		newlist = optarg
+	elif opt in ('-p', '--pretend',):
+		pretend = True
+	elif opt in ('-v', '--verbose',):
+		verbose = True
+
+	elif opt in ('-h', '--help'):
+		sys.stdout.write(__doc__)
+		sys.exit(0)
+
+if editor.endswith('vim'): editor += ' -n --nofork'
+
+
+def shQuote(text):
+	"""Quote the given text so that is a single string in sh code.
+	
+	Note that this leaves literal newlines alone (sh and bash are fine with that, but other tools may mess them up and need to do some special handling on the output of this function).
+	"""
+	return "'%s'" % text.replace("'", r"'\''")
+
+
+if __name__=='__main__':
+	#uniq id for this system
+	progid = '%s.%s' % (os.path.basename(__file__), os.getpid())
+
+	try:
+		#--- prep
+
+		#this writes filenames to /tmp -- set an appropriately restrictive umask
+		os.umask(0077)
+
+		#make oldlist, the list of original filenames
+		if oldlist is None:	
+			oldlist = '/tmp/%s.old' % progid
+			
+			sh = 'ls -A1'
+			if len(args)>0: sh += 'd'
+			sh = '%s %s > %s' % (sh, ' '.join(map(shQuote, args)), oldlist)
+			rc = subprocess.call(sh, shell=True)
+			if rc!=0: sys.exit((rc,128-rc)[rc<0])  #(the sh code will have written the error (unless terminated by a signal))
+		
+		#make tmplist, used internally in an intermediate step (not actually made yet)
+		tmplist = '/tmp/%s.tmp' % progid
+		
+		#make newlist, the list that will be opened in an editor
+		if newlist is None:
+			newlist = '/tmp/%s.new' % progid
+			
+			sh = 'cp -a %s %s' % (oldlist, newlist)
+			rc = subprocess.call(sh, shell=True)
+			if rc!=0: sys.exit((rc,128-rc)[rc<0])  #(the sh code will have written the error (unless terminated by a signal))
+			
+			sh = '%s %s' % (editor, newlist)
+			rc = subprocess.call(sh, shell=True)
+			if rc!=0: sys.exit((rc,128-rc)[rc<0])  #(the sh code will have written the error (unless terminated by a signal))
+
+		
+		#--- sanity checks
+
+		#make sure both lists still have the same number of entries (it would be VERY bad to shift all the names of the files)
+		sh = 'test $(cat %s | wc -l) -eq $(cat %s | wc -l)' % (oldlist, newlist)
+		rc = subprocess.call(sh, shell=True)
+		if rc!=0:
+			savelists = True
+			sys.stderr.write("*** ERROR *** number of new filenames does not match the number of old filenames, not renaming anything (see saved temporary files [%s] and [%s])\n" % (oldlist, newlist))
+			sys.exit(1)
+
+		#make sure progid is not in any old or new names
+		for l in (oldlist, newlist):
+			if open(l).read().find(progid)>=0:
+				sys.stderr.write("*** ERROR *** internal program id cannot be in any new or old names\n")
+				sys.exit(1)
+
+		
+		#--- actual renaming
+
+		#don't rename files directly, use intermediate temporary names -- this allows for swapping names
+
+		#first pass -- fill in tmplist, leaving blanks for any names not changed
+		if verbose:
+			print "--- renaming from original names to temporary, intermediate, names"
+			print
+		olditer = iter(open(oldlist))
+		newiter = iter(open(newlist))
+		tmpfile = open(tmplist,'w')
+		while True:
+			try:
+				oldfname = olditer.next().rstrip('\n')
+				newfname = newiter.next().rstrip('\n')
+				if newfname!=oldfname:
+					tmpfname = '%s.%s' % (oldfname, progid)
+					if verbose:
+						if pretend: print "(pretending)"
+						print "mv: %s" % oldfname
+						print "to: %s" % tmpfname
+						print
+					tmpfile.write('%s\n' % tmpfname)
+					if not pretend:
+						os.rename(oldfname, tmpfname)
+				else:
+					tmpfile.write('\n')
+			except StopIteration:
+				break
+		olditer.close()
+		tmpfile.close()
+		newiter.close()
+		
+		if verbose:
+			print "--- renaming from temporary names to final names"
+			print
+		
+		#second pass -- actual rename
+		olditer = iter(open(oldlist))
+		tmpiter = iter(open(tmplist))
+		newiter = iter(open(newlist))
+		while True:
+			try:
+				oldfname = olditer.next().rstrip('\n')
+				tmpfname = tmpiter.next().rstrip('\n')
+				newfname = newiter.next().rstrip('\n')
+				if newfname!=oldfname:
+					if tmpfname=='':
+						sys.stderr.write("*** ERROR *** internal error: tmpfname should never be empty string\n")
+						sys.exit(1)
+					if verbose:
+						if pretend: print "(pretending)"
+						print "mv: %s (now %s)" % (oldfname, tmpfname)
+						print "to: %s" % newfname
+						print
+					if not pretend:
+						os.rename(tmpfname, newfname)
+			except StopIteration:
+				break
+	finally:
+		if not savelists:
+			for fname in (oldlist, tmplist, newlist):
+				if fname is not None:
+					if os.path.exists(fname):
+						try:
+							os.remove(fname)
+						except Exception, e:
+							sys.stderr.write("WARNING: could not clean up temporary file(s): %s\n" % e)
+		else:
+			print "saved list of names before and after:"
+			print "old names:", oldlist
+			print "new names:", newlist
