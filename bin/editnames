@@ -59,6 +59,10 @@ OPTIONS
 REQUIREMENTS
     Writes new files to /tmp.
 
+BUGS
+    Raises `OSError: [Errno 22] Invalid argument' when using special characters 
+	like `&'.
+
 AUTHOR
     John Brunelle
 """
