@@ -14,7 +14,7 @@ DESCRIPTION
     only works for git clones and svn checkouts.
 
     This is an interactive script -- it prompts to continue or not throughout.  
-    Pipe in \`yes' to automate it.
+    (But it's designed such that piping in \`yes' will automate it.)
 
 OPTIONS
     --paths 'PATH1 PATH2 ...'
@@ -23,7 +23,7 @@ OPTIONS
         but variables or special characters like \`~' can be used and are 
         evaluated on each host.  Obviously, each PATH itself may not contain 
         any spaces (before being evaluated).  If a path does not exist on a 
-        host, it is noted and getting skipped.
+        host, it is noted and gets skipped.
     
     --hosts 'HOST1 HOST2 ...'
         The whitespace-separated list of hosts to involve.  Each HOST entry may 
