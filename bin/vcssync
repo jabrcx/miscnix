@@ -23,7 +23,13 @@ OPTIONS
         but variables or special characters like \`~' can be used and are 
         evaluated on each host.  Obviously, each PATH itself may not contain 
         any spaces (before being evaluated).  If a path does not exist on a 
+<<<<<<< HEAD
         host, it is noted and gets skipped.
+=======
+        host, it is noted (upon every operation) and getting skipped (the 
+        message will be something like \`bash: line 0: cd: PATH: No such file 
+        or directory').
+>>>>>>> 8e71d73280ecfdaa996f8d501b9741b5ba5b4760
     
     --hosts 'HOST1 HOST2 ...'
         The whitespace-separated list of hosts to involve.  Each HOST entry may 
