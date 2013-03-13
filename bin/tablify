@@ -118,7 +118,7 @@ try:
 		widths.append(w)
 
 	#deal with the headers
-	if headers=='on' or (headers=='auto' and sys.stdout.isatty()):
+	if len(entries)>0 and (headers=='on' or (headers=='auto' and sys.stdout.isatty())):
 		line = ''
 		for width, key in zip(widths, keys):
 			line += '%-*s' % (width, key) + ' '*border_width
