@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+#	use \033[...m to set the color where ... is one or more of the following codes, separated by [;] if multiple ones
+#		attributes
+#			code  meaning
+#			----------------
+#			0    reset all attributes to their defaults
+#			1    bold
+#			2    half bright
+#			4    underscore
+#			5    blink
+#			7    reverse video
+#			8    concealed
+#		foreground color
+#			3X where X is a digit in the range 0...7 (see colors below)
+#		background color
+#			4X where X is a digit in the range 0...7 (see colors below)
+#		(see the console_codes man page)
+#	use \033[00m (attribute none) to revert back to no specified color
+#	colors
+#		code  normal        when bolded foreground
+#		----------------------------------------
+#		0     black         dark grey
+#		1     red           light red
+#		2     green         light green
+#		3     brown*        yellow
+#		4     blue          light blue
+#		5     magenta       light magenta
+#		6     cyan          light cyan
+#		7     light grey**  white
+#		*  usually called yellow
+#		** usually called white
+#	different behavior / other colors
+#		the console doesn't bold things (just uses the slightly different color)
+#		~/.Xdefaults can have very exoticly named colors
+#		programs like aterm can specify foreground and background colors in hex notation
+
+echo 'Take any of the following codes as CODE and write \033[CODEm...text...\033[00m.'
+echo 'If using in a prompt variable such as PS1, don'\''t forget to wrap it with \[ and \].'
+echo 'If doing a simple echo, don'\''t forget the -e.'
+echo 'Remember, there are default colors; whenever a color is not specified, the default is being shown (and it will vary).'
+echo
+for fg in '' 30 31 32 33 34 35 36 37; do
+	for att in 0 1; do
+		for bg in '' 40 41 42 43 44 45 46 47; do
+			echo -en '\033['
+
+			color="$att"
+			if [ -n "$fg" ]; then color="$color;$fg"; fi
+			if [ -n "$bg" ]; then color="$color;$bg"; fi
+			echo -en "${color}m"
+
+			if [ -z "$fg" ]; then echo -en '   '; fi
+			if [ -z "$bg" ]; then echo -en ' '; fi
+			echo -en "  $color  "
+			
+			echo -en '\033[00m'
+		done
+		echo
+	done
+done
