@@ -1,0 +1,124 @@
+#!/usr/bin/env python
+
+"""\
+NAME
+    remove_duplicate_files - remove files files from one directory duplicated in another
+
+SYNOPSIS
+    remove_duplicate_files --keep-in DIRECTORY1 --remove-from DIRECTORY2
+
+DESCRIPTION
+    This currently just prints rm command to run.
+
+    There may be some errors reported on stderr by find and md5sum.  These are 
+    ignored by this program, since it should only cause a failure to identify 
+    duplicates, rather than anything dangerous.
+
+OPTIONS
+    -k, --keep-in DIRECTORY
+        The directory in which to keep copies.
+    
+    -r, --remove-from DIRECTORY
+        The directory from which to remove copies.
+
+    -h, --help
+        Print this help.
+
+REQUIREMENTS
+    n/a
+
+BUGS/TODO
+    n/a
+
+AUTHOR
+    Copyright (c) 2013, John A. Brunelle
+"""
+
+import sys, getopt, subprocess
+
+keep_in = None
+remove_from = None
+
+try:
+	opts, args = getopt.gnu_getopt(sys.argv[1:], 'k:r:h', ('keep-in=', 'remove-from=', 'help',))
+except getopt.GetoptError, e:
+	sys.stderr.write("*** ERROR **** unable to process command line options: %s\n" % e)
+	sys.exit(1)
+for opt, optarg in opts:
+	if   opt in ('-k', '--keep-in'):
+		keep_in = optarg
+	elif opt in ('-r', '--remove-from'):
+		remove_from = optarg
+
+	elif opt in ('-h', '--help'):
+		sys.stdout.write(__doc__)
+		sys.exit(0)
+
+if keep_in is None or remove_from is None:
+	sys.stderr.write("*** ERROR *** both -k/--keep-in and -r/--remove-from must be given\n")
+	sys.exit(1)
+
+if keep_in==remove_from:
+	sys.stderr.write("*** ERROR *** -k/--keep-in directory cannot be the same as -r/--remove-from directory\n")
+	sys.exit(1)
+
+
+#---
+
+
+def shQuote(text):
+	"""quote the given text so that it is a single, safe string in sh code.
+
+	Note that this leaves literal newlines alone (sh and bash are fine with that, but other tools may mess them up and need to do some special handling on the output of this function).
+	"""
+	return "'%s'" % text.replace("'", r"'\''")
+
+
+d_by_size = {}
+
+sh = 'find %s %s ' % (shQuote(keep_in), shQuote(remove_from)) + "-type f -printf '%s %p\n'"
+p = subprocess.Popen(sh, shell=True, stdout=subprocess.PIPE)
+for line in p.stdout.readlines():
+	size, path = line.rstrip().split(None,1)
+	try:
+		d_by_size[size].append(path)
+	except KeyError:
+		d_by_size[size] = [path,]
+p.wait()
+rc = p.returncode
+##don't bother exiting if find had some trouble with some stuff
+#if rc!=0: sys.exit((rc,128-rc)[rc<0])  #(the sh code will have written the error (unless terminated by a signal))
+
+for size, paths in d_by_size.items():
+	if len(paths)==1: continue
+	
+	d_by_csum = {}
+	for path in paths:
+		sh = 'md5sum %s' % shQuote(path)
+		p = subprocess.Popen(sh, shell=True, stdout=subprocess.PIPE)
+		stdout = p.communicate()[0].strip(); rc = p.returncode
+		if rc!=0:
+			##don't bother exiting if it had trouble, just move on to the next one
+			#sys.exit((rc,128-rc)[rc<0])  #(the sh code will have written the error (unless terminated by a signal))
+			continue
+
+		csum = stdout.split(None,1)[0]
+
+		try:
+			d_by_csum[csum].append(path)
+		except:
+			d_by_csum[csum] = [path,]
+	
+	for csum, paths in d_by_csum.items():
+		path_in_keep_in = None
+		paths_in_remove_from = []
+		
+		for path in paths:
+			if path.startswith(keep_in+'/'):
+				path_in_keep_in = path
+			elif path.startswith(remove_from+'/'):
+				paths_in_remove_from.append(path)
+
+		if path_in_keep_in is not None:
+			for path in paths_in_remove_from:
+				print 'rm %s  #same as: %s' % (shQuote(path), shQuote(path_in_keep_in))
