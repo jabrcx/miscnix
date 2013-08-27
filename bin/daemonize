@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+
+#
+# This turns a shell script into a proper daemon, i.e. a process that:
+#
+#	* is adopted by init
+#	* has no controlling terminal
+#	* is in a session with no session leader
+#	* is in a process group with no process group leader
+#	* has no files from the calling environment left open
+#
+# Source (don't execute) this script!  (Of course, you can just copy-n-paste 
+# the following code directly into your script instead of sourcing this 
+# script).
+#
+# Unlike with the fork() system call, this uses bash's & which will 
+# *re-execute* the calling script from the beginning therefore, source this 
+# script *before* any logic that cannot be executed multiple times or, use the 
+# DAMEONIZED environment variable that this sets to make sure code preceding 
+# the call to this script only gets executed once.  DAEMONIZED is:
+#	
+#	* empty before this is called (or at least should be)
+#	* equal to "y" after the daemonizing procedure is finished
+#	* set to temporary values in between
+#
+# Thus, after this script is sourced, execution will continue in the caller, 
+# but it'll be in separate child process, will have chdir-ed, redirected 
+# stdin/stdout/stderr, etc.
+#
+
+if [ -z "${DAEMONIZED:-}" ]; then
+	#step 1: put this in a new session (and process group) with no controlling terminal
+	export DAEMONIZED=1
+	
+	#it's okay if the following setsid process ends up a process group leader (e.g. this script is sourced from a shell with active job control), since setsid will automatically fork and continue in its child (which isn't a process group leader)
+	#	in this case, the setsid call will immediately return since this script will only wait on the parent, which exits
+	#it's also okay if the following setsid process *doesn't* end up a process leader (the usual case), and therefore doesn't fork, since the next step below forks anyways
+	#	in this case, this script will wait on the setsid call, but once that process reaches the fork in step 2 below, it (the parent in that fork step) exits
+	setsid "$0" "$@"
+	exit
+elif [ "$DAEMONIZED" -eq 1 ]; then
+	#step 2: fork, to make sure no parent hangs waiting (possibly already taken care of be setsid above), and to make the new session and new process group have no leaders
+	export DAEMONIZED=2
+	
+	"$0" "$@" <&0 &  #without the <&0, it will redirect stdin from /dev/null (stdout and stderr are not altered like this)
+	exit
+elif [ "$DAEMONIZED" -eq 2 ]; then
+	#step 3: don't leave anything from the calling environment open
+	DAEMONIZED=y
+	
+	cd /
+
+	#do not leave i/o with original terminal, but allow that i/o was directed to/from other places to begin with
+	#the main script following this can always reset them to, for example, log files
+	test -t 0 && exec 0</dev/null
+	test -t 1 && exec 1>>/dev/null
+	test -t 2 && exec 2>>/dev/null
+
+	#(no exit; code continues in the calling script)
+
+	unset DAEMONIZED
+else
+	echo "*** ERROR *** the DAEMONIZED environment variable appears to already be in use for some other purpose" >&2
+	exit 1
+fi
+
+##to capture stdout and stderr (which, if not originally directed to files, are now directed to /dev/null), use something like this:
+#exec 1>>/tmp/"$(basename "$0")".log
+#exec 2>>/tmp/"$(basename "$0")".log
