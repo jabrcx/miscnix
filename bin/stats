@@ -1,0 +1,78 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2013, John A. Brunelle
+# All rights reserved.
+
+"""\
+NAME
+    stats - print out some basic statistics of a set of numbers
+
+SYNOPSIS
+    stats FILENAME...
+
+DESCRIPTION
+    If no FILENAME is given, this reads from stdin.
+
+    * blank lines are okay
+    * commas in numbers are okay
+
+OPTIONS
+    -h, --help
+        Print this help.
+
+REQUIREMENTS
+    numpy
+
+BUGS/TODO
+    Would like to add an option to use hurry module for more easily readable 
+    sizes.
+
+AUTHOR
+    Copyright (c) 2013, John A. Brunelle
+    All rights reserved.
+"""
+
+import sys, getopt
+
+try:
+	opts, args = getopt.gnu_getopt(sys.argv[1:], 'h', ('help',))
+except getopt.GetoptError, e:
+	sys.stderr.write("*** ERROR **** unable to process command line options: %s\n" % e)
+	sys.exit(1)
+for opt, optarg in opts:
+	if opt in ('-h', '--help'):
+		sys.stdout.write(__doc__)
+		sys.exit(0)
+
+import numpy as np
+
+if len(args)==0: args.append('-')
+
+
+#---
+
+
+v = []
+
+for filename in args:
+	if filename=='-':
+		f = sys.stdin
+	else:
+		f = open(filename,'r')
+
+	for line in f.readlines():
+		line = line.strip().replace(',','')
+		if line=='': continue
+		v.append(float(line))
+
+	f.close()
+
+print "sum         :", np.sum(v)
+print "average     :", np.average(v)
+print "std         :", np.std(v)
+print "median      :", np.median(v)
+
+hist, hist_bin_edges = np.histogram(v, 10)
+min = np.min(v)
+max = np.max(v)
+print 'min/hist/max:', np.min(v), np.histogram(v, 10)[0], np.max(v)
