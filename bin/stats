@@ -67,6 +67,7 @@ for filename in args:
 
 	f.close()
 
+print "count       :", len(v)
 print "sum         :", np.sum(v)
 print "average     :", np.average(v)
 print "std         :", np.std(v)
