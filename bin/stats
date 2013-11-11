@@ -20,27 +20,34 @@ OPTIONS
     -h, --help
         Print this help.
 
+    -b, --human-readable
+        Print output in appropriate units of 1024.
+
 REQUIREMENTS
     numpy
 
 BUGS/TODO
-    Would like to add an option to use hurry module for more easily readable 
-    sizes.
+    n/a
 
 AUTHOR
     Copyright (c) 2013, John A. Brunelle
     All rights reserved.
 """
 
-import sys, getopt
+import sys, getopt, math
+
+human_readable = False
 
 try:
-	opts, args = getopt.gnu_getopt(sys.argv[1:], 'h', ('help',))
+	opts, args = getopt.gnu_getopt(sys.argv[1:], 'bh', ('human-readable','help',))
 except getopt.GetoptError, e:
 	sys.stderr.write("*** ERROR **** unable to process command line options: %s\n" % e)
 	sys.exit(1)
 for opt, optarg in opts:
-	if opt in ('-h', '--help'):
+	if   opt in ('-b', '--human-readable'):
+		human_readable = True
+
+	elif opt in ('-h', '--help'):
 		sys.stdout.write(__doc__)
 		sys.exit(0)
 
@@ -51,6 +58,30 @@ if len(args)==0: args.append('-')
 
 #---
 
+
+#helpers
+
+def format(x):
+	if human_readable:
+		pass
+		for e, l in (
+			(0, ''),
+			(1, 'Ki'),
+			(2, 'Mi'),
+			(3, 'Gi'),
+			(4, 'Ti'),
+			(5, 'Pi'),
+			(6, 'Ei'),
+			(7, 'Zi'),
+			(8, 'Yi'),
+			):
+			x2 = float(x)/(1024**e)
+			if int(math.floor(x2))<1000 or e==8:
+				return '%s %s' % (str(x2), l)
+	return str(x)
+
+
+#read data
 
 v = []
 
@@ -67,13 +98,16 @@ for filename in args:
 
 	f.close()
 
-print "count       :", len(v)
-print "sum         :", np.sum(v)
-print "average     :", np.average(v)
-print "std         :", np.std(v)
-print "median      :", np.median(v)
+
+#compute and print statistics
+
+print "count       :", format(len(v))
+print "sum         :", format(np.sum(v))
+print "average     :", format(np.average(v))
+print "std         :", format(np.std(v))
+print "median      :", format(np.median(v))
 
 hist, hist_bin_edges = np.histogram(v, 10)
 min = np.min(v)
 max = np.max(v)
-print 'min/hist/max:', np.min(v), np.histogram(v, 10)[0], np.max(v)
+print 'min/hist/max:', format(np.min(v)), np.histogram(v, 10)[0], format(np.max(v))
