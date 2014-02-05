@@ -188,17 +188,17 @@ prunes="-name .git -o -name .svn -o -name CVS"
 if ! $no_fhs_search; then
 	for pair in \
 		bin/PATH \
-		sbin/PATH \
-		lib/LD_LIBRARY_PATH \
-		lib64/LD_LIBRARY_PATH \
-		lib/LIBRARY_PATH \
-		lib64/LIBRARY_PATH \
-		pkgconfig/PKG_CONFIG_PATH \
 		include/CPATH \
 		include/FPATH \
 		info/INFOPATH \
-		site-packages/PYTHONPATH \
+		lib/LD_LIBRARY_PATH \
+		lib/LIBRARY_PATH \
+		lib64/LD_LIBRARY_PATH \
+		lib64/LIBRARY_PATH \
 		man/MANPATH \
+		pkgconfig/PKG_CONFIG_PATH \
+		sbin/PATH \
+		site-packages/PYTHONPATH \
 	; do
 		read -r dir var <<< $(echo $pair | tr / ' ')
 		for d in $(find "$directory" -maxdepth "$maxdepth" \( $prunes \) -prune -o \( -type d -a -name "$dir" \) -print ); do
