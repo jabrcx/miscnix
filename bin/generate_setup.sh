@@ -65,6 +65,10 @@ OPTIONS
     --no-fhs-search
         Do not do the standard search for bin, lib, etc.  Use in combination 
         with -x/--executables, otherwise this script will do nothing.
+
+    -p, --prefix STRING
+        Use the given STRING for the prefix in the output, instead of the 
+        absolute path of the directory given on the command line.
     
     -m, --modules-format
         Legacy.  Shorthand for \`--format modules --action echo'.
@@ -87,7 +91,8 @@ REQUIREMENTS
     that was introduced around version 3 of bash.
 
 AUTHOR
-    John Brunelle
+	Copyright (c) 2013, John A. Brunelle
+	All rights reserved
 "
 
 directory=''  #the default is set below (we don't want to use BASH_SOURCE unless we have to)
@@ -95,9 +100,13 @@ maxdepth=999999999
 format='bash'
 action='eval'
 executables=false
+prefix='54ca5f88e43f4ef993b54ba2d21b24ba'  #a magic string, to allow '' prefix
 no_fhs_search=false
 
-args=$(getopt -l format:,action:,max-depth:,executables,no-fhs-search,modules-format,help -o xmh -- "$@")
+#hack to avoid digging into version control directories
+prunes="-name .git -o -name .svn -o -name CVS"
+
+args=$(getopt -l format:,action:,max-depth:,executables,no-fhs-search,prefix,modules-format,help -o xp:mh -- "$@")
 if [ $? -ne 0 ]; then
 	#(getopt will have written the error message)
 	return 65 &>/dev/null  #(this script will often be sourced)
@@ -143,6 +152,11 @@ while [ ! -z "$1" ]; do
 			no_fhs_search=true
 			;;
 
+		-p | --prefix)
+			prefix="$2"
+			shift
+			;;
+
 		-m | --modules-format)
 			format=modules
 			action=echo
@@ -172,6 +186,8 @@ if [ -z "$directory" ]; then
 else
 	directory="$(readlink -e "$directory")"
 fi
+test "$prefix" = '54ca5f88e43f4ef993b54ba2d21b24ba' && prefix="$directory"
+test -n "$prefix" && prefix="$prefix/"
 
 if [ "$format" = modules ] && [ "$action" = eval ]; then
 	echo "*** ERROR *** --action eval only supported with --format bash" >&2
@@ -182,8 +198,24 @@ fi
 
 #---
 
-#hack to avoid digging into version control directories
-prunes="-name .git -o -name .svn -o -name CVS"
+
+function doit() {
+	d="$1"
+	var="$2"
+	width=20  #max width of any var, plus two
+	
+	d=${d##./}
+	space="$(printf '%'$(( $width - $(echo "$var" | wc -c )))s ' ')"
+	case "$format" in
+		bash)
+			s='export '$space$var'="'"$prefix$d"':$'$var'"'
+			;;
+		modules)
+			s='prepend-path '$var$space' '"$prefix$d"
+			;;
+	esac
+	$action "$s"
+}
 
 if ! $no_fhs_search; then
 	for pair in \
@@ -201,31 +233,15 @@ if ! $no_fhs_search; then
 		site-packages/PYTHONPATH \
 	; do
 		read -r dir var <<< $(echo $pair | tr / ' ')
-		for d in $(find "$directory" -maxdepth "$maxdepth" \( $prunes \) -prune -o \( -type d -a -name "$dir" \) -print ); do
-			case "$format" in
-				bash)
-					s='export '$var'="'"$d"':$'$var'"'
-					;;
-				modules)
-					s='prepend-path '$var' '"$d"
-					;;
-			esac
-			$action "$s"
+		for d in $(cd "$directory" && find -L . -maxdepth "$maxdepth" \( $prunes \) -prune -o \( -type d -a -name "$dir" \) -print ); do
+			doit "$d" "$var"
 		done
 	done
 fi
 
 if $executables; then
 	var=PATH
-	for d in $(find -L "$directory" -maxdepth "$(( maxdepth + 1))" \( $prunes \) -prune -o \( -type f -a -perm -u=x \) -print0 | xargs -0 -n 1 dirname | sort | uniq); do
-		case "$format" in
-			bash)
-				s='export '$var'="'"$d"':$'$var'"'
-				;;
-			modules)
-				s='prepend-path '$var' '"$d"
-				;;
-		esac
-		$action "$s"
+	for d in $(cd "$directory" && find -L . -maxdepth "$(( maxdepth + 1))" \( $prunes \) -prune -o \( -type f -a -perm -u=x \) -print0 | xargs -0 -n 1 dirname | sort | uniq); do
+		doit "$d" "$var"
 	done
 fi
