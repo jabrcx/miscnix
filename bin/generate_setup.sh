@@ -1,5 +1,8 @@
 #/usr/bin/env
 
+# Copyright (c) 2013, John A. Brunelle
+# All rights reserved
+
 helpstr="\
 NAME
     generate_setup.sh/setup.sh - handle shell environment setup things
