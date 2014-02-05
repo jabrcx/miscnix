@@ -43,8 +43,21 @@ DESCRIPTION
 
 OPTIONS
     --format FORMAT
-        FORMAT values can be \`bash' or \`modules' (see 
-        http://modules.sourceforge.net/).  Default is \`bash'.
+        FORMAT values can be:
+         
+         * bash
+         
+         * modules
+
+           environment modules in TCL format, for use with 
+           http://modules.sourceforge.net/
+         
+         * lmod
+
+           environment modules in lua format, for use with
+           https://www.tacc.utexas.edu/tacc-projects/lmod
+           
+        The default is \`bash'.
 
     --action ACTION
         ACTION values can be \`echo', to just print the code to the screen, or 
@@ -106,7 +119,7 @@ no_fhs_search=false
 #hack to avoid digging into version control directories
 prunes="-name .git -o -name .svn -o -name CVS"
 
-args=$(getopt -l format:,action:,max-depth:,executables,no-fhs-search,prefix,modules-format,help -o xp:mh -- "$@")
+args=$(getopt -l format:,action:,max-depth:,executables,no-fhs-search,prefix:,modules-format,help -o xp:mh -- "$@")
 if [ $? -ne 0 ]; then
 	#(getopt will have written the error message)
 	return 65 &>/dev/null  #(this script will often be sourced)
@@ -119,7 +132,7 @@ while [ ! -z "$1" ]; do
 			format="$2"
 			shift
 			case "$format" in
-				bash | modules)
+				bash | modules | lmod)
 					;;
 				*)
 					echo "*** ERROR *** [$format] is not a valid --format" >&2
@@ -213,6 +226,8 @@ function doit() {
 		modules)
 			s='prepend-path '$var$space' '"$prefix$d"
 			;;
+		lmod)
+			s='prepend_path("'$var'",'$space'"'$prefix$d'")'
 	esac
 	$action "$s"
 }
