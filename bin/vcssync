@@ -112,8 +112,8 @@ prep () {
 	local type="$3"
 	case "$type" in
 		git)
-			echo "(git add .)"
-			ssh "$host" "cd '$path' && git add ."
+			echo "(git add --all .)"
+			ssh "$host" "cd '$path' && git add --all ."
 			echo "(git commit -v -m '$message')"
 			ssh "$host" "cd '$path' && git commit -v -m '$message'"
 			;;
