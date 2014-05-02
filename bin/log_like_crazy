@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+
+# Copyright (c) 2014, John A. Brunelle
+# All rights reserved.
+
+set -e
+
+helpstr="\
+NAME
+	log_like_crazy - capture output of a bunch of system queries
+
+SYNOPSIS
+	log_like_crazy
+
+DESCRIPTION
+	n/a
+
+OPTIONS
+	-l, --loop
+		Run in a continuous loop (see -i/--interval).
+	
+	-i, --interval SECONDS
+		If running in a loop, how long to sleep between runs.
+
+	-h, --help
+		Print this help.
+
+REQUIREMENTS
+	n/a
+
+BUGS/TODO
+	n/a
+
+AUTHOR
+	Copyright (c) 2014, John A. Brunelle
+	All rights reserved.
+"
+
+loop=false
+interval=60  #seconds
+
+args=$(getopt -n "$(basename "$0")" -l loop,interval:,help -o li:h -- "$@")
+if [ $? -ne 0 ]; then
+	exit 65  #(getopt will have written the error message)
+fi
+eval set -- "$args"
+while [ ! -z "$1" ]; do
+	case "$1" in
+		-l | --loop)
+			loop=true
+			;;
+		-i | --interval)
+			interval="$2"
+			shift
+			;;
+
+		-h | --help)
+			echo -n "$helpstr"
+			exit 0
+			;;
+		--) 
+			shift
+			break
+			;;
+	esac
+	shift
+done
+
+#set -u
+
+
+#---
+
+timecmd='date +%Y-%m-%d.%H:%M:%S.%N'
+
+set +e
+while true; do
+	fnamebase="$(hostname -s)"."$($timecmd)"
+
+	ps axjf &> "$fnamebase".ps_axjf.out
+	
+	ps -Leo user:15,pid,nlwp,lwp,pcpu,pmem,vsize,rss,stat,wchan:25,command &> "$fnamebase".ps_-Leo.out
+	
+	lsof &> "$fnamebase".lsof.out
+
+	squeue -w "$(hostname -s)" -t RUNNING &> "$fnamebase".squeue.out
+
+	if $loop; then
+		sleep "$interval"
+	else
+		break
+	fi
+done
+set -e
