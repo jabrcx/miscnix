@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+# Copyright (c) 2014, John A. Brunelle
+# All rights reserved.
+
+set -e
+
+helpstr="\
+NAME
+	mtime_from_filename - set file mtime from a timestamp in the filename
+
+SYNOPSIS
+	mtime_from_filename FILE...
+
+DESCRIPTION
+	n/a
+
+OPTIONS
+	-h, --help
+		Print this help.
+
+REQUIREMENTS
+	n/a
+
+BUGS/TODO
+	n/a
+
+AUTHOR
+	Copyright (c) 2016, John A. Brunelle
+	All rights reserved.
+"
+
+getopt -q -l help -o h -- "$@" | egrep -q '^ -h|^ --help' && echo -n "$helpstr" && exit
+
+set -u
+
+#---
+
+for path in "$@"; do
+	t=$(echo "$path" | grep -oP '\d{8}_\d{6}')
+	touch --date="${t:0:4}-${t:4:2}-${t:6:2} ${t:9:2}:${t:11:2}:${t:13:2}" "$path"
+done
